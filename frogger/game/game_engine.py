@@ -21,6 +21,7 @@ from game.renderer import (
 
 LANE_SPEEDS = [1.5, -2, 2, -2.5, 1.5, -2]   # one entry per road row, alternating direction
 GOAL_SCORE = 100
+TIME_LIMIT = 30
 
 
 class GameEngine:
@@ -29,6 +30,9 @@ class GameEngine:
         self.score = 0
         self.game_over = False
         self.game_won = False
+        self.time_up = False
+        self.time_remaining = TIME_LIMIT
+        self.start_time = pygame.time.get_ticks()
         self._build_entities()
 
     def _build_entities(self):
@@ -68,7 +72,7 @@ class GameEngine:
                                               height=CELL_SIZE - 8, speed=speed))
 
     def handle_keydown(self, key):
-        if self.game_over and key != pygame.K_r:
+        if (self.game_over or self.time_up or self.game_won) and key != pygame.K_r:
             return
 
         if key == pygame.K_UP:
@@ -84,10 +88,20 @@ class GameEngine:
             self.score = 0
             self.game_over = False
             self.game_won = False
+            self.time_up = False
+            self.time_remaining = TIME_LIMIT
+            self.start_time = pygame.time.get_ticks()
             self._build_entities()
 
     def update(self):
-        if self.game_over or self.game_won:
+        if self.game_over or self.time_up or self.game_won:
+            return
+
+        elapsed_seconds = (pygame.time.get_ticks() - self.start_time) // 1000
+        self.time_remaining = max(0, TIME_LIMIT - elapsed_seconds)
+
+        if self.time_remaining == 0:
+            self.time_up = True
             return
 
         for v in self.vehicles:
@@ -109,8 +123,11 @@ class GameEngine:
         renderer.draw_scene(surface, self.frog, self.vehicles)
         renderer.draw_text(surface, font, f"Lives: {self.lives}", (10, 10))
         renderer.draw_text(surface, font, f"Score: {self.score}", (10, 34))
+        renderer.draw_text(surface, font, f"Time: {self.time_remaining}", (10, 58))
         renderer.draw_text(surface, font, "Arrow keys to move. R to restart.", (10, HEIGHT - 24))
         if self.game_over:
             renderer.draw_banner(surface, font, "GAME OVER - Press R to restart")
+        elif self.time_up:
+            renderer.draw_banner(surface, font, "TIME UP! - Press R to restart")
         elif self.game_won:
             renderer.draw_banner(surface, font, "GAME WON! - Press R to restart")
